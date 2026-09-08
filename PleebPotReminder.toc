@@ -4,7 +4,8 @@
 ## Author: Pleeb
 ## Category-enUS: PleebUI
 ## IconTexture: Interface\AddOns\PleebPotReminder\Media\logo.tga
-## Version: 2.1.1
+## Version: @project-version@
+## X-Curse-Project-ID: 1479150
 ## SavedVariables: PleebPotReminderDB
 ## SavedVariablesPerCharacter: PleebPotReminderCharacterDB
 
