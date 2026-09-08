@@ -1,6 +1,6 @@
 ## Interface: 120100
-## Title: Pleeb HP and Potion Reminder
-## Notes: Shows Healthstone, health potion, and mana potion reminders.
+## Title: PleebPot
+## Notes: Healthstone, health potion, and mana potion reminders.
 ## Author: Pleeb
 ## Category-enUS: PleebUI
 ## IconTexture: Interface\AddOns\PleebPotReminder\Media\logo.tga
