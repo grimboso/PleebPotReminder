@@ -1,8 +1,6 @@
 local ADDON_NAME, ns = ...
 
-local CreateColor = _G.CreateColor
 local CreateFrame = _G.CreateFrame
-local InCombatLockdown = _G.InCombatLockdown
 local STANDARD_TEXT_FONT = _G.STANDARD_TEXT_FONT
 local UIParent = _G.UIParent
 local UnitClass = _G.UnitClass
@@ -55,8 +53,6 @@ ns.DEFAULTS = {
 
 local BASE_EVENTS = {
   "PLAYER_ENTERING_WORLD",
-  "PLAYER_REGEN_DISABLED",
-  "PLAYER_REGEN_ENABLED",
   "PLAYER_DEAD",
   "PLAYER_ALIVE",
   "PLAYER_UNGHOST",
@@ -69,9 +65,9 @@ local PANEL_BACKDROP = {
   edgeSize = 1,
 }
 
-local hpCurve40 = C_CurveUtil.CreateColorCurve()
-local hpCurve20 = C_CurveUtil.CreateColorCurve()
-local mpCurve20 = C_CurveUtil.CreateColorCurve()
+local healthstoneCurve = C_CurveUtil.CreateCurve()
+local potionCurve = C_CurveUtil.CreateCurve()
+local manaPotionCurve = C_CurveUtil.CreateCurve()
 local holder
 local healthstoneText
 local potionText
@@ -81,7 +77,6 @@ local runtimeEnabled = false
 local previewActive = false
 local playerIsWarlock = false
 local playerUnavailable = false
-local playerInCombat = false
 local cachedPotionItemID = POTION_ITEM_IDS[1]
 local cachedManaPotionItemID = MANA_POTION_ITEM_IDS[1]
 local cachedHealthstoneItemID = HEALTHSTONE_ITEM_ID
@@ -95,9 +90,9 @@ local reminderTextDirty = true
 local reminderUpdateTimer
 local cooldownRefreshTimer
 
-hpCurve40:SetType(Enum.LuaCurveType.Step)
-hpCurve20:SetType(Enum.LuaCurveType.Step)
-mpCurve20:SetType(Enum.LuaCurveType.Step)
+healthstoneCurve:SetType(Enum.LuaCurveType.Step)
+potionCurve:SetType(Enum.LuaCurveType.Step)
+manaPotionCurve:SetType(Enum.LuaCurveType.Step)
 
 local function ClampNumber(value, minimum, maximum, fallback)
   return min(maximum, max(minimum, tonumber(value) or fallback))
@@ -118,7 +113,6 @@ end
 local function NormalizeSettings(source)
   local defaults = ns.DEFAULTS
   return {
-    schemaVersion = 1,
     enabled = source.enabled ~= false,
     healthstoneThreshold = ClampNumber(
       source.healthstoneThreshold,
@@ -159,12 +153,6 @@ local function InitializeDB()
   local globalSaved = _G.PleebPotReminderDB
   local globalSource = type(globalSaved) == "table" and globalSaved or {}
 
-  if type(globalSource.profiles) == "table"
-    and type(globalSource.profiles.Default) == "table"
-  then
-    globalSource = globalSource.profiles.Default
-  end
-
   ns.globalDB = NormalizeSettings(globalSource)
   _G.PleebPotReminderDB = ns.globalDB
 
@@ -174,7 +162,6 @@ local function InitializeDB()
   end
 
   ns.characterDB = {
-    schemaVersion = 1,
     usePerCharacterSettings =
       characterSaved.usePerCharacterSettings == true,
   }
@@ -302,9 +289,11 @@ local function GetReminderString(label, itemID, fallbackIcon)
   end
 
   return string.format(
-    "%s |T%d:18:18:0:0:64:64:5:59:5:59|t",
+    "%s |T%d:%d:%d:0:0:64:64:5:59:5:59|t",
     label,
-    icon
+    icon,
+    db.fontSize,
+    db.fontSize
   )
 end
 
@@ -313,17 +302,17 @@ local function BuildAlphaStepCurve(curve, thresholdPercent)
   local epsilon = 0.0001
 
   curve:ClearPoints()
-  curve:AddPoint(0, CreateColor(1, 1, 1, 1))
-  curve:AddPoint(threshold, CreateColor(1, 1, 1, 1))
-  curve:AddPoint(min(1, threshold + epsilon), CreateColor(1, 1, 1, 0))
-  curve:AddPoint(1, CreateColor(1, 1, 1, 0))
+  curve:AddPoint(0, 1)
+  curve:AddPoint(threshold, 1)
+  curve:AddPoint(min(1, threshold + epsilon), 0)
+  curve:AddPoint(1, 0)
 end
 
 function ns.BuildHealthCurves()
   local db = ns.db
-  BuildAlphaStepCurve(hpCurve40, db.healthstoneThreshold)
-  BuildAlphaStepCurve(hpCurve20, db.potionThreshold)
-  BuildAlphaStepCurve(mpCurve20, db.manaPotionThreshold)
+  BuildAlphaStepCurve(healthstoneCurve, db.healthstoneThreshold)
+  BuildAlphaStepCurve(potionCurve, db.potionThreshold)
+  BuildAlphaStepCurve(manaPotionCurve, db.manaPotionThreshold)
 end
 
 local function UpdateHolderSize()
@@ -333,16 +322,21 @@ local function UpdateHolderSize()
     potionText:GetStringWidth(),
     manaPotionText:GetStringWidth()
   ) + 32
+  local minimumWidth = db.iconOnly and (db.fontSize + 32) or 160
   holder:SetSize(
-    max(160, width),
+    max(minimumWidth, width),
     (db.fontSize * 3) + (db.iconOnly and 58 or 48)
   )
 end
 
-function ns.ApplyLayout()
+function ns.ApplyPosition()
   local db = ns.db
   holder:ClearAllPoints()
   holder:SetPoint("CENTER", UIParent, "CENTER", db.posX, db.posY)
+end
+
+function ns.ApplyAppearance()
+  local db = ns.db
 
   healthstoneText:SetFont(STANDARD_TEXT_FONT, db.fontSize, "OUTLINE")
   potionText:SetFont(STANDARD_TEXT_FONT, db.fontSize, "OUTLINE")
@@ -444,21 +438,22 @@ local function UpdateReminder()
   local manaPotionAlpha = 0
 
   if cachedHealthstoneReady then
-    local color = UnitHealthPercent("player", true, hpCurve40)
-    _, _, _, healthstoneAlpha = color:GetRGBA()
+    healthstoneAlpha = UnitHealthPercent(
+      "player",
+      true,
+      healthstoneCurve
+    )
   end
   if cachedPotionReady then
-    local color = UnitHealthPercent("player", true, hpCurve20)
-    _, _, _, potionAlpha = color:GetRGBA()
+    potionAlpha = UnitHealthPercent("player", true, potionCurve)
   end
   if db.enableManaPotion and cachedManaPotionReady then
-    local color = UnitPowerPercent(
+    manaPotionAlpha = UnitPowerPercent(
       "player",
       MANA_POWER_TYPE,
       true,
-      mpCurve20
+      manaPotionCurve
     )
-    _, _, _, manaPotionAlpha = color:GetRGBA()
   end
 
   healthstoneText:SetAlpha(healthstoneAlpha)
@@ -501,24 +496,26 @@ end
 function ns.RefreshRuntimeEventWiring()
   local db = ns.db
   if not runtimeEnabled then
+    eventFrame:UnregisterEvent("UNIT_HEALTH")
     eventFrame:UnregisterEvent("UNIT_POWER_UPDATE")
     eventFrame:UnregisterEvent("BAG_UPDATE_COOLDOWN")
     return
   end
 
-  if db.enableManaPotion then
+  local hasHealthItem = cachedHealthstoneCount > 0 or cachedPotionCount > 0
+  local hasManaPotion = db.enableManaPotion and cachedManaPotionCount > 0
+  if hasHealthItem then
+    eventFrame:RegisterUnitEvent("UNIT_HEALTH", "player")
+  else
+    eventFrame:UnregisterEvent("UNIT_HEALTH")
+  end
+  if hasManaPotion then
     eventFrame:RegisterUnitEvent("UNIT_POWER_UPDATE", "player")
   else
     eventFrame:UnregisterEvent("UNIT_POWER_UPDATE")
   end
 
-  if playerInCombat
-    and (
-      cachedHealthstoneCount > 0
-      or cachedPotionCount > 0
-      or (db.enableManaPotion and cachedManaPotionCount > 0)
-    )
-  then
+  if hasHealthItem or hasManaPotion then
     eventFrame:RegisterEvent("BAG_UPDATE_COOLDOWN")
   else
     eventFrame:UnregisterEvent("BAG_UPDATE_COOLDOWN")
@@ -547,13 +544,12 @@ local function HandleEvent(_, event, unitTarget, powerType)
   end
   if event == "PLAYER_ALIVE" or event == "PLAYER_UNGHOST" then
     playerUnavailable = UnitIsDeadOrGhost("player") == true
-  elseif event == "PLAYER_REGEN_DISABLED" then
-    playerInCombat = true
-  elseif event == "PLAYER_REGEN_ENABLED" then
-    playerInCombat = false
-  elseif event == "PLAYER_ENTERING_WORLD" then
+    RefreshCooldownReadiness()
+    ns.RunReminderUpdate()
+    return
+  end
+  if event == "PLAYER_ENTERING_WORLD" then
     playerUnavailable = UnitIsDeadOrGhost("player") == true
-    playerInCombat = InCombatLockdown() == true
   end
 
   RefreshOwnedItemCache()
@@ -577,7 +573,7 @@ local function SavePosition()
     1000,
     defaults.posY
   )
-  ns.ApplyLayout()
+  ns.ApplyPosition()
   ns.RefreshOptionsControls()
 end
 
@@ -643,7 +639,8 @@ local function CreateRuntimeFrames()
 
   eventFrame = CreateFrame("Frame")
   eventFrame:SetScript("OnEvent", HandleEvent)
-  ns.ApplyLayout()
+  ns.ApplyAppearance()
+  ns.ApplyPosition()
   UpdateReminder()
 end
 
@@ -659,13 +656,10 @@ local function EnableRuntime()
   for index = 1, #BASE_EVENTS do
     eventFrame:RegisterEvent(BASE_EVENTS[index])
   end
-  eventFrame:RegisterUnitEvent("UNIT_HEALTH", "player")
 
   playerUnavailable = UnitIsDeadOrGhost("player") == true
-  playerInCombat = InCombatLockdown() == true
   RefreshOwnedItemCache()
   ns.RefreshRuntimeEventWiring()
-  ns.ApplyLayout()
   ns.RunReminderUpdate()
 end
 
@@ -676,7 +670,6 @@ local function DisableRuntime()
 
   runtimeEnabled = false
   eventFrame:UnregisterAllEvents()
-  playerInCombat = false
 
   if reminderUpdateTimer then
     reminderUpdateTimer:Cancel()
@@ -719,7 +712,8 @@ function ns.SetUsePerCharacterSettings(enabled)
     DisableRuntime()
   end
   ns.RefreshRuntimeEventWiring()
-  ns.ApplyLayout()
+  ns.ApplyAppearance()
+  ns.ApplyPosition()
   ns.RefreshOptionsControls()
   ns.RunReminderUpdate()
 end
@@ -744,7 +738,6 @@ bootstrapFrame:SetScript("OnEvent", function(self, event, loadedAddon)
     InitializeDB()
     ns.BuildHealthCurves()
     CreateRuntimeFrames()
-    ns.CreateOptionsWindow()
 
     if IsLoggedIn() then
       ApplySavedRuntimeState()
