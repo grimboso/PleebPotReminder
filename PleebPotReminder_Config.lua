@@ -55,7 +55,9 @@ local function CreateCheckButton(parent, label, y, onClick)
 end
 
 local function UpdateSliderLabel(slider, value)
-  slider.valueText:SetText(slider.label .. ": " .. floor(value + 0.5))
+  slider.valueText:SetText(
+    slider.label .. ": " .. floor(value + 0.5) .. slider.suffix
+  )
 end
 
 local function CreateSlider(
@@ -65,6 +67,7 @@ local function CreateSlider(
   minimum,
   maximum,
   y,
+  suffix,
   onValueChanged
 )
   local slider = CreateFrame(
@@ -79,6 +82,7 @@ local function CreateSlider(
   slider:SetValueStep(1)
   slider:SetObeyStepOnDrag(true)
   slider.label = label
+  slider.suffix = suffix or ""
   slider.valueText = _G[name .. "Text"]
   _G[name .. "Low"]:SetText(minimum)
   _G[name .. "High"]:SetText(maximum)
@@ -111,6 +115,7 @@ local function CreateEditBox(parent, label, y, fallback, onCommit)
   editBox:SetPoint("TOPLEFT", labelText, "BOTTOMLEFT", 4, -5)
   editBox:SetAutoFocus(false)
   editBox:SetMaxLetters(80)
+  editBox.labelText = labelText
 
   local function Commit(self)
     local value = self:GetText():match("^%s*(.-)%s*$")
@@ -156,12 +161,24 @@ function ns.RefreshOptionsControls()
   controls.manaPotionEdit:SetText(db.manaPotionText)
   controls.manaPotionThreshold:SetEnabled(db.enableManaPotion)
   controls.manaPotionThreshold:SetAlpha(db.enableManaPotion and 1 or 0.5)
-  controls.manaPotionEdit:SetEnabled(db.enableManaPotion)
-  controls.manaPotionEdit:SetAlpha(db.enableManaPotion and 1 or 0.5)
+  local textEnabled = not db.iconOnly
+  local manaTextEnabled = textEnabled and db.enableManaPotion
+  controls.healthstoneEdit:SetEnabled(textEnabled)
+  controls.healthstoneEdit:SetAlpha(textEnabled and 1 or 0.5)
+  controls.healthstoneEdit.labelText:SetAlpha(textEnabled and 1 or 0.5)
+  controls.potionEdit:SetEnabled(textEnabled)
+  controls.potionEdit:SetAlpha(textEnabled and 1 or 0.5)
+  controls.potionEdit.labelText:SetAlpha(textEnabled and 1 or 0.5)
+  controls.manaPotionEdit:SetEnabled(manaTextEnabled)
+  controls.manaPotionEdit:SetAlpha(manaTextEnabled and 1 or 0.5)
+  controls.manaPotionEdit.labelText:SetAlpha(manaTextEnabled and 1 or 0.5)
   refreshingOptions = false
 end
 
 local function ToggleOptionsWindow()
+  if not optionsWindow then
+    ns.CreateOptionsWindow()
+  end
   if optionsWindow:IsShown() then
     optionsWindow:Hide()
   else
@@ -216,7 +233,7 @@ function ns.CreateOptionsWindow()
     "GameFontHighlightLarge"
   )
   title:SetPoint("LEFT", logo, "RIGHT", 10, 0)
-  title:SetText("Pleeb HP and Potion Reminder")
+  title:SetText("PleebPot")
   title:SetTextColor(0.20, 0.72, 0.92, 1)
 
   local close = CreateFrame(
@@ -253,7 +270,7 @@ function ns.CreateOptionsWindow()
   previewHelp:SetJustifyH("LEFT")
   previewHelp:SetWordWrap(true)
   previewHelp:SetText(
-    "The reminder is previewed while this window is open. Drag the highlighted reminder to move it."
+    "Preview is always shown while settings are open. Drag the highlighted reminder to move it."
   )
   previewHelp:SetTextColor(0.62, 0.68, 0.74, 1)
 
@@ -268,7 +285,7 @@ function ns.CreateOptionsWindow()
 
   controls.usePerCharacterSettings = CreateCheckButton(
     content,
-    "Use per character settings",
+    "Use separate settings for this character",
     -88,
     function(value)
       ns.SetUsePerCharacterSettings(value)
@@ -277,18 +294,19 @@ function ns.CreateOptionsWindow()
 
   controls.iconOnly = CreateCheckButton(
     content,
-    "Icon only",
+    "Icons only",
     -116,
     function(value)
       ns.db.iconOnly = value
-      ns.ApplyLayout()
+      ns.ApplyAppearance()
+      ns.RefreshOptionsControls()
       ns.RunReminderUpdate()
     end
   )
 
   controls.enableManaPotion = CreateCheckButton(
     content,
-    "Show mana potion reminder",
+    "Enable mana potion reminder",
     -144,
     function(value)
       ns.db.enableManaPotion = value
@@ -301,10 +319,11 @@ function ns.CreateOptionsWindow()
   controls.healthstoneThreshold = CreateSlider(
     content,
     "PleebPotReminderHealthstoneThresholdSlider",
-    "Healthstone threshold %",
+    "Healthstone",
     1,
     100,
     -194,
+    "% health",
     function(value)
       ns.db.healthstoneThreshold = ns.ClampThreshold(value)
       ns.BuildHealthCurves()
@@ -314,10 +333,11 @@ function ns.CreateOptionsWindow()
   controls.potionThreshold = CreateSlider(
     content,
     "PleebPotReminderPotionThresholdSlider",
-    "Health potion threshold %",
+    "Health Potion",
     1,
     100,
     -254,
+    "% health",
     function(value)
       ns.db.potionThreshold = ns.ClampThreshold(value)
       ns.BuildHealthCurves()
@@ -327,10 +347,11 @@ function ns.CreateOptionsWindow()
   controls.manaPotionThreshold = CreateSlider(
     content,
     "PleebPotReminderManaThresholdSlider",
-    "Mana potion threshold %",
+    "Mana Potion",
     1,
     100,
     -314,
+    "% mana",
     function(value)
       ns.db.manaPotionThreshold = ns.ClampThreshold(value)
       ns.BuildHealthCurves()
@@ -340,71 +361,74 @@ function ns.CreateOptionsWindow()
   controls.fontSize = CreateSlider(
     content,
     "PleebPotReminderFontSizeSlider",
-    "Font / icon size",
+    "Reminder size",
     10,
     128,
     -374,
+    "",
     function(value)
       ns.db.fontSize = value
-      ns.ApplyLayout()
+      ns.ApplyAppearance()
       ns.RunReminderUpdate()
     end
   )
   controls.posX = CreateSlider(
     content,
     "PleebPotReminderPositionXSlider",
-    "Position X",
+    "Horizontal offset",
     -1000,
     1000,
     -434,
+    "",
     function(value)
       ns.db.posX = value
-      ns.ApplyLayout()
+      ns.ApplyPosition()
     end
   )
   controls.posY = CreateSlider(
     content,
     "PleebPotReminderPositionYSlider",
-    "Position Y",
+    "Vertical offset",
     -1000,
     1000,
     -494,
+    "",
     function(value)
       ns.db.posY = value
-      ns.ApplyLayout()
+      ns.ApplyPosition()
     end
   )
 
   controls.healthstoneEdit = CreateEditBox(
     content,
-    "Healthstone text",
+    "Healthstone label",
     -542,
     defaults.healthstoneText,
     function(value)
       ns.db.healthstoneText = value
-      ns.ApplyLayout()
+      ns.ApplyAppearance()
       ns.RunReminderUpdate()
     end
   )
   controls.potionEdit = CreateEditBox(
     content,
-    "Health potion text",
+    "Health Potion label",
     -602,
     defaults.potionText,
     function(value)
       ns.db.potionText = value
-      ns.ApplyLayout()
+      ns.ApplyAppearance()
       ns.RunReminderUpdate()
     end
   )
   controls.manaPotionEdit = CreateEditBox(
     content,
-    "Mana potion text",
+    "Mana Potion label",
     -662,
     defaults.manaPotionText,
     function(value)
       ns.db.manaPotionText = value
-      ns.ApplyLayout()
+      ns.ApplyAppearance()
       ns.RunReminderUpdate()
     end
   )
@@ -421,7 +445,7 @@ function ns.CreateOptionsWindow()
   resetPosition:SetScript("OnClick", function()
     ns.db.posX = defaults.posX
     ns.db.posY = defaults.posY
-    ns.ApplyLayout()
+    ns.ApplyPosition()
     ns.RefreshOptionsControls()
   end)
 
@@ -435,7 +459,7 @@ function ns.CreateOptionsWindow()
   note:SetJustifyH("LEFT")
   note:SetWordWrap(true)
   note:SetText(
-    "Tracks Healthstones, Concentrated and standard Silvermoon Health Potions, their Fleeting variants, Algari Healing Potions, and Lightfused Mana Potions. Higher-strength qualities are preferred."
+    "Reminders appear when the matching item is in your bags and ready. Healthstone and Health Potion use your health thresholds; Mana Potion uses your mana threshold. Item selection is automatic."
   )
   note:SetTextColor(0.62, 0.68, 0.74, 1)
 
@@ -451,7 +475,6 @@ function ns.CreateOptionsWindow()
   end)
 
   UISpecialFrames[#UISpecialFrames + 1] = frame:GetName()
-  _G.SLASH_PLEEBPOTREMINDER1 = "/php"
-  _G.SLASH_PLEEBPOTREMINDER2 = "/phpconfig"
-  _G.SlashCmdList.PLEEBPOTREMINDER = ToggleOptionsWindow
 end
+_G.SLASH_PLEEBPOTREMINDER1 = "/pleebpot"
+_G.SlashCmdList.PLEEBPOTREMINDER = ToggleOptionsWindow
