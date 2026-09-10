@@ -1,13 +1,18 @@
 local _, ns = ...
 
 local CreateFrame = _G.CreateFrame
+local STANDARD_TEXT_FONT = _G.STANDARD_TEXT_FONT
 local UISpecialFrames = _G.UISpecialFrames
 local floor = math.floor
 
 local COLORS = {
   background = { 0.035, 0.043, 0.055, 0.98 },
+  panel = { 0.075, 0.088, 0.108, 1 },
   border = { 0.15, 0.18, 0.22, 1 },
-  control = { 0.075, 0.088, 0.108, 1 },
+  control = { 0.055, 0.064, 0.080, 1 },
+  accent = { 0.20, 0.72, 0.92, 1 },
+  text = { 0.94, 0.96, 0.98, 1 },
+  muted = { 0.60, 0.66, 0.72, 1 },
 }
 
 local PANEL_BACKDROP = {
@@ -36,20 +41,67 @@ local function SetBackdrop(frame, background, border)
   )
 end
 
+local function CreateLabel(parent, text, size)
+  local label = parent:CreateFontString(nil, "OVERLAY")
+  label:SetFont(STANDARD_TEXT_FONT, size or 12, "")
+  label:SetText(text or "")
+  label:SetTextColor(COLORS.text[1], COLORS.text[2], COLORS.text[3], COLORS.text[4])
+  label:SetJustifyH("LEFT")
+  return label
+end
+
+local function CreateButton(parent, text, width, height)
+  local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
+  button:SetSize(width or 120, height or 24)
+  SetBackdrop(button, COLORS.panel, COLORS.border)
+  button.label = CreateLabel(button, text, 12)
+  button.label:SetPoint("CENTER")
+  function button:SetText(value)
+    self.label:SetText(value or "")
+  end
+  button:SetScript("OnEnter", function(self)
+    self:SetBackdropBorderColor(COLORS.accent[1], COLORS.accent[2], COLORS.accent[3], 1)
+  end)
+  button:SetScript("OnLeave", function(self)
+    self:SetBackdropBorderColor(COLORS.border[1], COLORS.border[2], COLORS.border[3], 1)
+  end)
+  return button
+end
+
 local function CreateCheckButton(parent, label, y, onClick)
-  local button = CreateFrame(
-    "CheckButton",
-    nil,
-    parent,
-    "UICheckButtonTemplate"
-  )
-  button:SetSize(24, 24)
+  local button = CreateFrame("CheckButton", nil, parent)
+  button:SetSize(360, 22)
   button:SetPoint("TOPLEFT", parent, "TOPLEFT", 8, y)
-  button.Text:SetText(label)
+
+  button.box = CreateFrame("Frame", nil, button, "BackdropTemplate")
+  button.box:SetSize(16, 16)
+  button.box:SetPoint("LEFT", button, "LEFT", 0, 0)
+  button.box:EnableMouse(false)
+  SetBackdrop(button.box, COLORS.control, COLORS.border)
+
+  button.fill = button.box:CreateTexture(nil, "ARTWORK")
+  button.fill:SetPoint("TOPLEFT", button.box, "TOPLEFT", 3, -3)
+  button.fill:SetPoint("BOTTOMRIGHT", button.box, "BOTTOMRIGHT", -3, 3)
+  button.fill:SetColorTexture(COLORS.accent[1], COLORS.accent[2], COLORS.accent[3], 1)
+  button.fill:Hide()
+
+  button.label = CreateLabel(button, label, 11)
+  button.label:SetPoint("LEFT", button.box, "RIGHT", 6, 0)
+  button.label:SetPoint("RIGHT", button, "RIGHT", 0, 0)
   button:SetScript("OnClick", function(self)
+    self.fill:SetShown(self:GetChecked() == true)
     if not refreshingOptions then
       onClick(self:GetChecked() == true)
     end
+  end)
+  button:SetScript("OnEnter", function(self)
+    self.box:SetBackdropBorderColor(COLORS.accent[1], COLORS.accent[2], COLORS.accent[3], 1)
+  end)
+  button:SetScript("OnLeave", function(self)
+    self.box:SetBackdropBorderColor(COLORS.border[1], COLORS.border[2], COLORS.border[3], 1)
+  end)
+  hooksecurefunc(button, "SetChecked", function(self)
+    self.fill:SetShown(self:GetChecked() == true)
   end)
   return button
 end
@@ -70,22 +122,19 @@ local function CreateSlider(
   suffix,
   onValueChanged
 )
-  local slider = CreateFrame(
-    "Slider",
-    name,
-    parent,
-    "OptionsSliderTemplate"
-  )
-  slider:SetSize(360, 17)
+  local slider = CreateFrame("Slider", name, parent, "BackdropTemplate")
+  slider:SetSize(360, 16)
   slider:SetPoint("TOPLEFT", parent, "TOPLEFT", 36, y)
   slider:SetMinMaxValues(minimum, maximum)
   slider:SetValueStep(1)
   slider:SetObeyStepOnDrag(true)
+  slider:SetOrientation("HORIZONTAL")
+  slider:SetThumbTexture("Interface\\Buttons\\UI-SliderBar-Button-Horizontal")
+  SetBackdrop(slider, COLORS.control, COLORS.border)
   slider.label = label
   slider.suffix = suffix or ""
-  slider.valueText = _G[name .. "Text"]
-  _G[name .. "Low"]:SetText(minimum)
-  _G[name .. "High"]:SetText(maximum)
+  slider.valueText = CreateLabel(slider, "", 11)
+  slider.valueText:SetPoint("BOTTOMLEFT", slider, "TOPLEFT", 0, 5)
   slider:SetScript("OnValueChanged", function(self, value)
     local rounded = floor(value + 0.5)
     UpdateSliderLabel(self, rounded)
@@ -97,24 +146,17 @@ local function CreateSlider(
 end
 
 local function CreateEditBox(parent, label, y, fallback, onCommit)
-  local labelText = parent:CreateFontString(
-    nil,
-    "OVERLAY",
-    "GameFontHighlight"
-  )
+  local labelText = CreateLabel(parent, label, 11)
   labelText:SetPoint("TOPLEFT", parent, "TOPLEFT", 8, y)
-  labelText:SetText(label)
 
-  local editBox = CreateFrame(
-    "EditBox",
-    nil,
-    parent,
-    "InputBoxTemplate"
-  )
+  local editBox = CreateFrame("EditBox", nil, parent, "BackdropTemplate")
   editBox:SetSize(360, 24)
   editBox:SetPoint("TOPLEFT", labelText, "BOTTOMLEFT", 4, -5)
   editBox:SetAutoFocus(false)
   editBox:SetMaxLetters(80)
+  editBox:SetFont(STANDARD_TEXT_FONT, 12, "")
+  editBox:SetTextInsets(6, 6, 3, 3)
+  SetBackdrop(editBox, COLORS.control, COLORS.border)
   editBox.labelText = labelText
 
   local function Commit(self)
@@ -211,10 +253,10 @@ function ns.CreateOptionsWindow()
   local header = CreateFrame("Frame", nil, frame, "BackdropTemplate")
   header:SetPoint("TOPLEFT", frame, "TOPLEFT", 1, -1)
   header:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -1, -1)
-  header:SetHeight(64)
+  header:SetHeight(70)
   header:EnableMouse(true)
   header:RegisterForDrag("LeftButton")
-  SetBackdrop(header, COLORS.control, COLORS.border)
+  SetBackdrop(header, COLORS.panel, COLORS.border)
   header:SetScript("OnDragStart", function()
     frame:StartMoving()
   end)
@@ -227,25 +269,38 @@ function ns.CreateOptionsWindow()
   logo:SetPoint("LEFT", header, "LEFT", 12, 0)
   logo:SetTexture("Interface\\AddOns\\PleebPotReminder\\Media\\logo.tga")
 
-  local title = header:CreateFontString(
-    nil,
-    "OVERLAY",
-    "GameFontHighlightLarge"
-  )
-  title:SetPoint("LEFT", logo, "RIGHT", 10, 0)
-  title:SetText("PleebPot")
-  title:SetTextColor(0.20, 0.72, 0.92, 1)
+  local title = CreateLabel(header, "PleebPot", 20)
+  title:SetPoint("TOPLEFT", logo, "TOPRIGHT", 12, -2)
+  title:SetFont(STANDARD_TEXT_FONT, 20, "OUTLINE")
+  title:SetTextColor(COLORS.accent[1], COLORS.accent[2], COLORS.accent[3], 1)
 
-  local close = CreateFrame(
-    "Button",
-    nil,
+  local description = CreateLabel(
     header,
-    "UIPanelCloseButton"
+    "Reminders for Healthstones and combat potions.",
+    11
   )
-  close:SetPoint("TOPRIGHT", header, "TOPRIGHT", -2, -2)
+  description:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -7)
+  description:SetTextColor(COLORS.muted[1], COLORS.muted[2], COLORS.muted[3], COLORS.muted[4])
+
+  local close = CreateButton(header, "×", 30, 30)
+  close:SetPoint("TOPRIGHT", header, "TOPRIGHT", -10, -10)
   close:SetScript("OnClick", function()
     frame:Hide()
   end)
+
+  local footer = CreateFrame("Frame", nil, frame, "BackdropTemplate")
+  footer:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 1, 1)
+  footer:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -1, 1)
+  footer:SetHeight(28)
+  SetBackdrop(footer, COLORS.panel, COLORS.border)
+
+  local footerText = CreateLabel(footer, "PleebUI  ·  /pleebpot", 11)
+  footerText:SetPoint("LEFT", footer, "LEFT", 12, 0)
+  footerText:SetTextColor(COLORS.muted[1], COLORS.muted[2], COLORS.muted[3], COLORS.muted[4])
+
+  local footerState = CreateLabel(footer, "Changes apply immediately", 11)
+  footerState:SetPoint("RIGHT", footer, "RIGHT", -12, 0)
+  footerState:SetTextColor(COLORS.muted[1], COLORS.muted[2], COLORS.muted[3], COLORS.muted[4])
 
   local scroll = CreateFrame(
     "ScrollFrame",
@@ -254,7 +309,7 @@ function ns.CreateOptionsWindow()
     "UIPanelScrollFrameTemplate"
   )
   scroll:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 12, -10)
-  scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -30, 12)
+  scroll:SetPoint("BOTTOMRIGHT", footer, "TOPRIGHT", -30, -12)
 
   local content = CreateFrame("Frame", nil, scroll)
   content:SetSize(438, 840)
@@ -433,15 +488,8 @@ function ns.CreateOptionsWindow()
     end
   )
 
-  local resetPosition = CreateFrame(
-    "Button",
-    nil,
-    content,
-    "UIPanelButtonTemplate"
-  )
-  resetPosition:SetSize(160, 24)
+  local resetPosition = CreateButton(content, "Reset position", 160, 24)
   resetPosition:SetPoint("TOPLEFT", content, "TOPLEFT", 8, -730)
-  resetPosition:SetText("Reset position")
   resetPosition:SetScript("OnClick", function()
     ns.db.posX = defaults.posX
     ns.db.posY = defaults.posY
