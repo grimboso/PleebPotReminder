@@ -6,6 +6,7 @@
 ## IconTexture: Interface\AddOns\PleebPotReminder\Media\logo.tga
 ## Version: @project-version@
 ## X-Curse-Project-ID: 1479150
+## OptionalDeps: PleebUI
 ## SavedVariables: PleebPotReminderDB
 ## SavedVariablesPerCharacter: PleebPotReminderCharacterDB
 
