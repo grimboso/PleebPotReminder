@@ -218,6 +218,11 @@ function ns.RefreshOptionsControls()
 end
 
 local function ToggleOptionsWindow()
+  if ns.PleebUIPlugin then
+    ns.PleebUIPlugin:OpenOptions("general")
+    return
+  end
+
   if not optionsWindow then
     ns.CreateOptionsWindow()
   end
@@ -287,6 +292,8 @@ function ns.CreateOptionsWindow()
   close:SetScript("OnClick", function()
     frame:Hide()
   end)
+  frame.puiHeader = header
+  frame.puiCloseButton = close
 
   local footer = CreateFrame("Frame", nil, frame, "BackdropTemplate")
   footer:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 1, 1)
@@ -524,5 +531,26 @@ function ns.CreateOptionsWindow()
 
   UISpecialFrames[#UISpecialFrames + 1] = frame:GetName()
 end
+
+function ns.MountPleebUIOptions(host)
+  if not optionsWindow then
+    ns.CreateOptionsWindow()
+  end
+
+  optionsWindow:SetParent(host)
+  optionsWindow:SetFrameStrata(host:GetFrameStrata())
+  optionsWindow:SetFrameLevel(host:GetFrameLevel() + 1)
+  optionsWindow:SetToplevel(false)
+  optionsWindow:SetClampedToScreen(false)
+  optionsWindow:SetMovable(false)
+  optionsWindow:ClearAllPoints()
+  optionsWindow:SetAllPoints(host)
+  optionsWindow.puiHeader:EnableMouse(false)
+  optionsWindow.puiCloseButton:Hide()
+  optionsWindow:Show()
+
+  return optionsWindow
+end
+
 _G.SLASH_PLEEBPOTREMINDER1 = "/pleebpot"
 _G.SlashCmdList.PLEEBPOTREMINDER = ToggleOptionsWindow
