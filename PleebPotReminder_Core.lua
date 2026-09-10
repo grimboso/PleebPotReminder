@@ -644,6 +644,40 @@ local function CreateRuntimeFrames()
   UpdateReminder()
 end
 
+local function RegisterPleebUIPlugin()
+  local API = _G.PleebUIAPI
+  if not API then
+    return
+  end
+
+  local plugin = API:RegisterPlugin("PleebPotReminder", {
+    name = "PleebPot",
+    order = 20,
+    navDescription = "Healthstone and potion reminders.",
+    navGlyph = "PT",
+  })
+  ns.PleebUIPlugin = plugin
+
+  plugin:RegisterOptionsPage("general", {
+    name = "General",
+    order = 10,
+    buildPage = ns.MountPleebUIOptions,
+    customPageOwnsHeader = true,
+  })
+
+  plugin:RegisterMover("reminders", holder, {
+    label = "PleebPot reminders",
+    optionsPage = "general",
+    savePosition = SavePosition,
+    resetPosition = function()
+      ns.db.posX = ns.DEFAULTS.posX
+      ns.db.posY = ns.DEFAULTS.posY
+      ns.ApplyPosition()
+      ns.RefreshOptionsControls()
+    end,
+  })
+end
+
 local function EnableRuntime()
   if runtimeEnabled then
     return
@@ -738,6 +772,7 @@ bootstrapFrame:SetScript("OnEvent", function(self, event, loadedAddon)
     InitializeDB()
     ns.BuildHealthCurves()
     CreateRuntimeFrames()
+    RegisterPleebUIPlugin()
 
     if IsLoggedIn() then
       ApplySavedRuntimeState()
