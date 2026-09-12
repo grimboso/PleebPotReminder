@@ -218,11 +218,6 @@ function ns.RefreshOptionsControls()
 end
 
 local function ToggleOptionsWindow()
-  if ns.PleebUIPlugin then
-    ns.PleebUIPlugin:OpenOptions("general")
-    return
-  end
-
   if not optionsWindow then
     ns.CreateOptionsWindow()
   end
