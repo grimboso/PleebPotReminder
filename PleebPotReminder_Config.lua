@@ -6,19 +6,19 @@ local UISpecialFrames = _G.UISpecialFrames
 local floor = math.floor
 
 local COLORS = {
-  background = { 0.035, 0.043, 0.055, 0.98 },
-  panel = { 0.075, 0.088, 0.108, 1 },
-  border = { 0.15, 0.18, 0.22, 1 },
-  control = { 0.055, 0.064, 0.080, 1 },
-  accent = { 0.20, 0.72, 0.92, 1 },
-  text = { 0.94, 0.96, 0.98, 1 },
-  muted = { 0.60, 0.66, 0.72, 1 },
+  background = { 0.12, 0.12, 0.16, 0.92 },
+  panel = { 0.12, 0.12, 0.16, 0.92 },
+  border = { 0.20, 0.20, 0.24, 1 },
+  control = { 0.070, 0.070, 0.090, 0.96 },
+  accent = { 0.20, 0.65, 1.00, 1 },
+  text = { 0.96, 0.96, 0.96, 1 },
+  muted = { 0.96, 0.96, 0.96, 0.72 },
 }
 
 local PANEL_BACKDROP = {
   bgFile = "Interface\\Buttons\\WHITE8x8",
   edgeFile = "Interface\\Buttons\\WHITE8x8",
-  edgeSize = 1,
+  edgeSize = 3,
 }
 
 local optionsWindow
