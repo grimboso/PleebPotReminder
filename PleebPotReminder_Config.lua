@@ -553,4 +553,5 @@ function ns.MountPleebUIOptions(host)
 end
 
 _G.SLASH_PLEEBPOTREMINDER1 = "/pleebpot"
+_G.SLASH_PLEEBPOTREMINDER2 = "/php"
 _G.SlashCmdList.PLEEBPOTREMINDER = ToggleOptionsWindow
