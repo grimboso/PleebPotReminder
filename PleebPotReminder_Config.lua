@@ -7,7 +7,7 @@ local floor = math.floor
 
 local COLORS = {
   background = { 0.12, 0.12, 0.16, 0.92 },
-  panel = { 0.12, 0.12, 0.16, 0.92 },
+  panel = { 0.070, 0.070, 0.090, 0.96 },
   border = { 0.20, 0.20, 0.24, 1 },
   control = { 0.070, 0.070, 0.090, 0.96 },
   accent = { 0.20, 0.65, 1.00, 1 },
@@ -53,7 +53,7 @@ end
 local function CreateButton(parent, text, width, height)
   local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
   button:SetSize(width or 120, height or 24)
-  SetBackdrop(button, COLORS.panel, COLORS.border)
+  SetBackdrop(button, COLORS.control, COLORS.border)
   button.label = CreateLabel(button, text, 12)
   button.label:SetPoint("CENTER")
   function button:SetText(value)
@@ -74,7 +74,7 @@ local function CreateCheckButton(parent, label, y, onClick)
   button:SetPoint("TOPLEFT", parent, "TOPLEFT", 8, y)
 
   button.box = CreateFrame("Frame", nil, button, "BackdropTemplate")
-  button.box:SetSize(16, 16)
+  button.box:SetSize(18, 18)
   button.box:SetPoint("LEFT", button, "LEFT", 0, 0)
   button.box:EnableMouse(false)
   SetBackdrop(button.box, COLORS.control, COLORS.border)
@@ -123,13 +123,21 @@ local function CreateSlider(
   onValueChanged
 )
   local slider = CreateFrame("Slider", name, parent, "BackdropTemplate")
-  slider:SetSize(360, 16)
+  slider:SetSize(360, 20)
   slider:SetPoint("TOPLEFT", parent, "TOPLEFT", 36, y)
   slider:SetMinMaxValues(minimum, maximum)
   slider:SetValueStep(1)
   slider:SetObeyStepOnDrag(true)
   slider:SetOrientation("HORIZONTAL")
-  slider:SetThumbTexture("Interface\\Buttons\\UI-SliderBar-Button-Horizontal")
+  slider:SetThumbTexture("Interface\\Buttons\\WHITE8x8")
+  local thumb = slider:GetThumbTexture()
+  thumb:SetSize(16, 16)
+  thumb:SetVertexColor(
+    COLORS.accent[1],
+    COLORS.accent[2],
+    COLORS.accent[3],
+    COLORS.accent[4]
+  )
   SetBackdrop(slider, COLORS.control, COLORS.border)
   slider.label = label
   slider.suffix = suffix or ""
@@ -155,6 +163,12 @@ local function CreateEditBox(parent, label, y, fallback, onCommit)
   editBox:SetAutoFocus(false)
   editBox:SetMaxLetters(80)
   editBox:SetFont(STANDARD_TEXT_FONT, 12, "")
+  editBox:SetTextColor(
+    COLORS.text[1],
+    COLORS.text[2],
+    COLORS.text[3],
+    COLORS.text[4]
+  )
   editBox:SetTextInsets(6, 6, 3, 3)
   SetBackdrop(editBox, COLORS.control, COLORS.border)
   editBox.labelText = labelText
@@ -217,13 +231,37 @@ function ns.RefreshOptionsControls()
   refreshingOptions = false
 end
 
+local function RestoreStandaloneOptions(frame)
+  if frame.embedded ~= true then
+    return false
+  end
+
+  frame.embedded = nil
+  frame:SetParent(UIParent)
+  frame:SetFrameStrata("DIALOG")
+  frame:SetFrameLevel(1)
+  frame:SetToplevel(true)
+  frame:SetClampedToScreen(true)
+  frame:SetMovable(true)
+  frame:ClearAllPoints()
+  frame:SetSize(500, 650)
+  frame:SetPoint("CENTER")
+  frame.puiHeader:EnableMouse(true)
+  frame.puiCloseButton:Show()
+  return true
+end
+
 local function ToggleOptionsWindow()
   if not optionsWindow then
     ns.CreateOptionsWindow()
   end
-  if optionsWindow:IsShown() then
+
+  local restored = RestoreStandaloneOptions(optionsWindow)
+
+  if optionsWindow:IsShown() and not restored then
     optionsWindow:Hide()
   else
+    ns.RefreshOptionsControls()
     optionsWindow:Show()
     optionsWindow:Raise()
   end
@@ -329,7 +367,12 @@ function ns.CreateOptionsWindow()
   previewHelp:SetText(
     "Preview is always shown while settings are open. Drag the highlighted reminder to move it."
   )
-  previewHelp:SetTextColor(0.62, 0.68, 0.74, 1)
+  previewHelp:SetTextColor(
+    COLORS.muted[1],
+    COLORS.muted[2],
+    COLORS.muted[3],
+    COLORS.muted[4]
+  )
 
   controls.enabled = CreateCheckButton(
     content,
@@ -511,7 +554,12 @@ function ns.CreateOptionsWindow()
   note:SetText(
     "Reminders appear when the matching item is in your bags and ready. Healthstone and Health Potion use your health thresholds; Mana Potion uses your mana threshold. Item selection is automatic."
   )
-  note:SetTextColor(0.62, 0.68, 0.74, 1)
+  note:SetTextColor(
+    COLORS.muted[1],
+    COLORS.muted[2],
+    COLORS.muted[3],
+    COLORS.muted[4]
+  )
 
   frame:SetScript("OnShow", function()
     ns.RefreshOptionsControls()
@@ -532,6 +580,7 @@ function ns.MountPleebUIOptions(host)
     ns.CreateOptionsWindow()
   end
 
+  optionsWindow.embedded = true
   optionsWindow:SetParent(host)
   optionsWindow:SetFrameStrata(host:GetFrameStrata())
   optionsWindow:SetFrameLevel(host:GetFrameLevel() + 1)
@@ -542,6 +591,7 @@ function ns.MountPleebUIOptions(host)
   optionsWindow:SetAllPoints(host)
   optionsWindow.puiHeader:EnableMouse(false)
   optionsWindow.puiCloseButton:Hide()
+  ns.RefreshOptionsControls()
   optionsWindow:Show()
 
   return optionsWindow
