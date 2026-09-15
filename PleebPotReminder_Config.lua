@@ -349,7 +349,7 @@ function ns.CreateOptionsWindow()
     "UIPanelScrollFrameTemplate"
   )
   scroll:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 12, -10)
-  scroll:SetPoint("BOTTOMRIGHT", footer, "TOPRIGHT", -30, -12)
+  scroll:SetPoint("BOTTOMRIGHT", footer, "TOPRIGHT", -30, 12)
 
   local content = CreateFrame("Frame", nil, scroll)
   content:SetSize(438, 840)
