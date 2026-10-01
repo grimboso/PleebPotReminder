@@ -411,6 +411,7 @@ function ns.CreateOptionsWindow()
     function(value)
       ns.db.enableManaPotion = value
       ns.RefreshRuntimeEventWiring()
+      ns.ApplyAppearance()
       ns.RefreshOptionsControls()
       ns.RunReminderUpdate()
     end

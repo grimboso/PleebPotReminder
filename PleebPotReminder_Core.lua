@@ -317,15 +317,27 @@ end
 
 local function UpdateHolderSize()
   local db = ns.db
+  local rowSpacing = db.iconOnly and 8 or 4
   local width = max(
     healthstoneText:GetStringWidth(),
-    potionText:GetStringWidth(),
-    manaPotionText:GetStringWidth()
-  ) + 32
+    potionText:GetStringWidth()
+  )
+  local height = healthstoneText:GetStringHeight()
+    + potionText:GetStringHeight()
+
+  if db.enableManaPotion then
+    width = max(width, manaPotionText:GetStringWidth())
+    height = height
+      + rowSpacing
+      + manaPotionText:GetStringHeight()
+  end
+
   local minimumWidth = db.iconOnly and (db.fontSize + 32) or 160
+  local holderPadding = db.iconOnly and 50 or 44
+
   holder:SetSize(
-    max(minimumWidth, width),
-    (db.fontSize * 3) + (db.iconOnly and 58 or 48)
+    max(minimumWidth, width + 32),
+    height + holderPadding
   )
 end
 
