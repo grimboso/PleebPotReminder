@@ -500,6 +500,7 @@ local function QueueCooldownRefresh()
   cooldownRefreshTimer = C_Timer.NewTimer(UPDATE_DELAY, function()
     cooldownRefreshTimer = nil
     if RefreshCooldownReadiness() then
+      ns.RefreshRuntimeEventWiring()
       ns.RunReminderUpdate()
     end
   end)
@@ -515,13 +516,17 @@ function ns.RefreshRuntimeEventWiring()
   end
 
   local hasHealthItem = cachedHealthstoneCount > 0 or cachedPotionCount > 0
+  local hasReadyHealthItem = cachedHealthstoneReady or cachedPotionReady
   local hasManaPotion = db.enableManaPotion and cachedManaPotionCount > 0
-  if hasHealthItem then
+  local hasReadyManaPotion = db.enableManaPotion and cachedManaPotionReady
+
+  if hasReadyHealthItem then
     eventFrame:RegisterUnitEvent("UNIT_HEALTH", "player")
   else
     eventFrame:UnregisterEvent("UNIT_HEALTH")
   end
-  if hasManaPotion then
+
+  if hasReadyManaPotion then
     eventFrame:RegisterUnitEvent("UNIT_POWER_UPDATE", "player")
   else
     eventFrame:UnregisterEvent("UNIT_POWER_UPDATE")
